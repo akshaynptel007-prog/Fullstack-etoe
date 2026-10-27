@@ -279,7 +279,7 @@ Costs, knobs (NAT on/off, ARM64, external RabbitMQ, pre-warm schedules) and oper
 | Suite | What it proves | Run |
 |---|---|---|
 | Backend unit (19) | JWT, settings safety, client-IP parsing, sale state | `cd backend && uv run pytest tests/unit` |
-| Backend integration (33) | Lua gate atomicity (1,000 concurrent vs 100), rate limiter, idempotent redelivery, DB guard, unique buyer, API contract, **2,000 concurrent HTTP checkouts vs 500 units → exactly 500**, locking-strategy comparison | `make test-backend` |
+| Backend integration (34) | Lua gate atomicity (1,000 concurrent vs 100), rate limiter, idempotent redelivery, DB guard, unique buyer, broker-failure compensation, API contract, **2,000 concurrent HTTP checkouts vs 500 units → exactly 500**, locking-strategy comparison | `make test-backend` |
 | Frontend (15) | single-flight lock under a click burst, retry/backoff, timeout, Retry-After, adaptive polling, button states | `cd frontend && npm test` |
 | Bundle budget | ≤ 200 KB minified total, ≤ 75 KB gzip initial | `npm run check:size` |
 | Lighthouse (CI) | TTI / LCP ≤ 1.5 s, TBT, CLS, script size | CI `e2e` job |

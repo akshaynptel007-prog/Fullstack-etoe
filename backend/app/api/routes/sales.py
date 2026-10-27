@@ -78,14 +78,14 @@ async def sale_events(sale_id: int, resources: ResourcesDep) -> StreamingRespons
             headers={"Retry-After": "5"},
         )
 
-    queue = broadcaster.subscribe(sale_id)
-    initial = await resources.gate.remaining(sale_id)
-
     async def stream() -> AsyncIterator[str]:
+        # Subscribe inside the generator: if the client disconnects before
+        # streaming starts, nothing was registered, so nothing can leak.
+        queue = broadcaster.subscribe(sale_id)
         try:
             # Clients reconnect after `retry` ms (plus their own jitter).
             yield "retry: 3000\n\n"
-            remaining = initial
+            remaining = await resources.gate.remaining(sale_id)
             while True:
                 status = build_status(sale, remaining)
                 yield _sse("status", status.model_dump_json())

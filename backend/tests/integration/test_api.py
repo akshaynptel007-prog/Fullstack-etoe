@@ -5,7 +5,9 @@ import pytest
 from httpx import AsyncClient
 
 from app.config import Settings
+from app.messaging import OrderPublisher
 from app.models import OrderStatus
+from app.services.inventory import InventoryGate
 from tests.integration.conftest import AuthedUser, ClientFactory, SaleFactory
 
 
@@ -215,3 +217,26 @@ async def test_burst_of_concurrent_checkouts_never_oversells(
     assert stats["redis_stock"] == 0
     assert stats["oversold"] is False
     assert stats["consistent"] is True
+
+
+async def test_broker_failure_releases_the_unit(
+    client: AsyncClient,
+    make_sale: SaleFactory,
+    make_users,
+    gate: InventoryGate,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If RabbitMQ does not confirm, the reservation is undone and the client told to retry."""
+    sale = await make_sale(stock=1)
+    [user] = await make_users(1)
+
+    async def broken_publish(self: OrderPublisher, payload: object) -> None:
+        raise ConnectionError("broker unreachable")
+
+    monkeypatch.setattr(OrderPublisher, "publish", broken_publish)
+    response = await client.post(f"/api/v1/sales/{sale.id}/checkout", headers=user.headers)
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "2"
+    assert response.json()["error"]["code"] == "QUEUE_UNAVAILABLE"
+    assert await gate.remaining(sale.id) == 1  # the unit is back on sale
+    assert await gate.reservations(sale.id) == 0

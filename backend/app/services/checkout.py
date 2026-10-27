@@ -8,6 +8,7 @@ replica can answer thousands of them per second. The heavy, durable write
 happens asynchronously in the worker.
 """
 
+import contextlib
 import logging
 import time
 import uuid
@@ -108,11 +109,6 @@ class CheckoutService:
     async def _enqueue(
         self, sale: SaleInfo, user_id: uuid.UUID, order_id: uuid.UUID, request_id: str | None
     ) -> None:
-        # Status first, publish second: the worker's final status can then
-        # never be overwritten by a late PENDING.
-        await self._order_status.set(
-            order_id, status=OrderStatus.PENDING, sale_id=sale.id, user_id=user_id
-        )
         message = OrderReservedMessage(
             order_id=order_id,
             sale_id=sale.id,
@@ -122,19 +118,28 @@ class CheckoutService:
             request_id=request_id,
         )
         try:
+            # Status first, publish second: the worker's final status can then
+            # never be overwritten by a late PENDING.
+            await self._order_status.set(
+                order_id, status=OrderStatus.PENDING, sale_id=sale.id, user_id=user_id
+            )
             await self._publisher.publish(message)
         except Exception as exc:
-            # The broker did not take responsibility for the order: undo the
-            # reservation so the unit goes back on sale, and tell the client
-            # to retry. Fails safe: worst case is a brief undersell, never an
-            # oversell (see docs/concurrency.md, "ambiguous publish").
+            # The order was not handed to the broker: undo the reservation so
+            # the unit goes back on sale, and tell the client to retry. Fails
+            # safe: worst case is a brief undersell, never an oversell (see
+            # docs/concurrency.md, "ambiguous publish"). Compensation is best
+            # effort — if Redis itself is down, `reconcile` repairs it later.
             log.exception(
-                "publish failed, releasing reservation", extra={"order_id": str(order_id)}
+                "could not enqueue order, releasing reservation",
+                extra={"order_id": str(order_id)},
             )
-            await self._gate.release(sale.id, user_id, order_id)
-            await self._order_status.set(
-                order_id, status=OrderStatus.FAILED, sale_id=sale.id, user_id=user_id
-            )
+            with contextlib.suppress(Exception):
+                await self._gate.release(sale.id, user_id, order_id)
+            with contextlib.suppress(Exception):
+                await self._order_status.set(
+                    order_id, status=OrderStatus.FAILED, sale_id=sale.id, user_id=user_id
+                )
             CHECKOUT_RESULTS.labels("queue_unavailable").inc()
             raise AppError(
                 503,
