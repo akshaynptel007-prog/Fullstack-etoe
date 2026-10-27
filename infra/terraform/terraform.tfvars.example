@@ -1,0 +1,26 @@
+# Copy to terraform.tfvars (gitignored) and adjust. Every value is optional.
+# Full reference: docs/ENVIRONMENT.md and docs/deployment-aws.md
+
+project_name = "flashsale"
+environment  = "dev"
+aws_region   = "ap-south-1" # Mumbai: closest to Indian shoppers
+
+# Cost savers for a demo account
+# enable_nat_gateway = false   # tasks get public IPs instead of a ~$32/mo NAT
+# cpu_architecture   = "ARM64" # Graviton (deploy.sh builds an arm64 image)
+
+# Use a free CloudAMQP broker instead of Amazon MQ (~$25-30/mo):
+# rabbitmq_external_url = "amqps://user:password@host.rmq.cloudamqp.com/vhost"
+
+# Pre-warm 10 minutes before an 8:00 PM IST sale on 1 Nov 2026, scale back at 9 PM.
+# prewarm_schedules = [
+#   { name = "sale-start", schedule = "at(2026-11-01T19:50:00)", api_min = 8, api_max = 20, worker_min = 3, worker_max = 6 },
+#   { name = "sale-end",   schedule = "at(2026-11-01T21:00:00)", api_min = 2, api_max = 10, worker_min = 1, worker_max = 4 },
+# ]
+
+# alarm_email = "you@example.com"
+
+# Production hardening
+# db    = { instance_class = "db.t4g.small", engine_version = "16", allocated_storage = 20, multi_az = true, deletion_protection = true, skip_final_snapshot = false }
+# redis = { node_type = "cache.t4g.small", engine_version = "7.1", num_nodes = 2 }
+# enable_bot_control = true
