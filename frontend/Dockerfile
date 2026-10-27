@@ -20,7 +20,8 @@ ENV API_UPSTREAM=api:8000 \
     NGINX_API_BURST=200 \
     NGINX_CHECKOUT_RATE=20r/s \
     NGINX_CHECKOUT_BURST=40 \
-    NGINX_BOT_FILTER=1
+    NGINX_BOT_FILTER=1 \
+    NGINX_ACCESS_LOG=all
 RUN rm -f /etc/nginx/conf.d/default.conf
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 COPY nginx/snippets /etc/nginx/snippets

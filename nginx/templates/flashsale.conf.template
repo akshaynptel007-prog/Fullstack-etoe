@@ -27,6 +27,17 @@ limit_req_log_level warn;
 proxy_cache_path /var/cache/nginx/status levels=1:2 keys_zone=status_cache:10m
                  max_size=64m inactive=30s use_temp_path=off;
 
+# Access-log volume: "all" (default) or "errors" (5xx only) for spikes.
+map $status $is_5xx {
+    ~^5     1;
+    default 0;
+}
+map "${NGINX_ACCESS_LOG}:$is_5xx" $loggable {
+    "~^all:"   1;
+    "errors:1" 1;
+    default    0;
+}
+
 # Known scanners / scripted clients and empty user agents. Trivially spoofed,
 # so it is only the first, cheapest filter (rate limits + WAF do the rest).
 map $http_user_agent $bad_ua {
