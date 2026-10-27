@@ -36,7 +36,11 @@ def test_token_roundtrip() -> None:
 
 def test_tampered_token_is_rejected() -> None:
     token, _ = create_access_token(uuid.uuid4(), SETTINGS)
-    forged = jwt.encode({"sub": str(uuid.uuid4())}, "attacker-secret-that-is-long-enough-0123456789", algorithm="HS256")
+    forged = jwt.encode(
+        {"sub": str(uuid.uuid4())},
+        "attacker-secret-that-is-long-enough-0123456789",
+        algorithm="HS256",
+    )
     with pytest.raises(AppError) as exc:
         decode_access_token(forged, SETTINGS)
     assert exc.value.status_code == 401
