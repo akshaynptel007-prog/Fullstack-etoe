@@ -61,3 +61,8 @@ output "alb_dns_name" {
 output "log_groups" {
   value = module.compute.log_groups
 }
+
+output "image_tag" {
+  description = "Backend image tag currently deployed (deploy.sh --skip-image reuses it)."
+  value       = var.image_tag
+}

@@ -168,12 +168,20 @@ async def prime_sale(
 async def prime_open_sales(
     sessionmaker: async_sessionmaker[AsyncSession], gate: InventoryGate
 ) -> None:
-    """Startup self-heal: load tokens for every not-yet-ended sale (SET NX)."""
-    async with sessionmaker() as session:
-        sale_ids = (await session.scalars(select(Sale.id).where(Sale.ends_at > utcnow()))).all()
-        for sale_id in sale_ids:
-            if await prime_sale(session, gate, sale_id):
-                log.warning("primed redis inventory from database", extra={"sale_id": sale_id})
+    """Startup self-heal: load tokens for every not-yet-ended sale (SET NX).
+
+    Best effort: a replica must still boot if the database is briefly
+    unreachable or not migrated yet (first deploy). Checkout re-primes on
+    demand, so nothing is lost by skipping this.
+    """
+    try:
+        async with sessionmaker() as session:
+            sale_ids = (await session.scalars(select(Sale.id).where(Sale.ends_at > utcnow()))).all()
+            for sale_id in sale_ids:
+                if await prime_sale(session, gate, sale_id):
+                    log.warning("primed redis inventory from database", extra={"sale_id": sale_id})
+    except Exception:
+        log.warning("startup priming skipped; will prime on demand", exc_info=True)
 
 
 # --- Admin operations ---------------------------------------------------------------
