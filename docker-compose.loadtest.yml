@@ -1,0 +1,36 @@
+# Load-test overlay: lifts the per-IP limits (every virtual user shares the
+# k6 container's IP) while keeping per-user limits, and adds k6.
+#   ./loadtest/run.sh   (or: make loadtest)
+services:
+  api:
+    # Horizontal scale-out of the stateless API — the point of the design.
+    deploy:
+      replicas: ${API_REPLICAS:-6}
+    environment:
+      RATE_LIMIT_CHECKOUT_PER_IP: "10000000"
+      LOG_LEVEL: WARNING # access logs for 100k requests would dominate CPU
+
+  web:
+    environment:
+      NGINX_API_RATE: 100000r/s
+      NGINX_API_BURST: "100000"
+      NGINX_CHECKOUT_RATE: 100000r/s
+      NGINX_CHECKOUT_BURST: "100000"
+      NGINX_ACCESS_LOG: errors
+
+  k6:
+    profiles: ["loadtest"]
+    image: grafana/k6:1.3.0
+    environment:
+      BASE_URL: http://web:8080
+      SALE_ID: "1"
+      RATE: ${RATE:-1500}
+      DURATION: ${DURATION:-10s}
+    volumes:
+      - ./loadtest/k6:/scripts:ro
+      - ./loadtest/.data:/data:ro
+      - ./loadtest/results:/results
+    command: ["run", "--summary-export", "/results/summary.json", "/scripts/flash-sale.js"]
+    depends_on:
+      web:
+        condition: service_healthy
