@@ -4,7 +4,9 @@ from pydantic import ValidationError
 from app.config import Settings
 
 
-def test_local_defaults_boot_without_env() -> None:
+def test_local_defaults_boot_without_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for var in ("APP_ENV", "CORS_ORIGINS"):
+        monkeypatch.delenv(var, raising=False)
     settings = Settings(_env_file=None)
     assert settings.app_env == "local"
     assert settings.cors_origin_list == []
