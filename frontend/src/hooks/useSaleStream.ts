@@ -95,6 +95,12 @@ export function useSaleStream(saleId: number | undefined): void {
       openStream() // give SSE another chance
     }
 
+    // Immediate snapshot from the edge-cached status endpoint, so the first
+    // paint shows real stock even before the stream connects.
+    api
+      .saleStatus(saleId, controller.signal)
+      .then(({ data }) => setStatus(data))
+      .catch(() => undefined)
     openStream()
     return () => {
       controller.abort()
