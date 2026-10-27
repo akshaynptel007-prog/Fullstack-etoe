@@ -1,0 +1,7 @@
+# Root build context is only used by frontend/Dockerfile.
+*
+!frontend/
+!nginx/
+frontend/node_modules
+frontend/dist
+frontend/coverage

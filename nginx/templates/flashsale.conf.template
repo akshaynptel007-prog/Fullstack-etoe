@@ -1,0 +1,139 @@
+# Local API gateway + static file server.
+#   - load balances across all `api` replicas (least_conn, keep-alive pool,
+#     DNS re-resolution as replicas scale up/down)
+#   - per-IP rate limits (strictest on checkout), connection caps for SSE
+#   - cheap bot filter on checkout
+#   - 1 s micro-cache with request collapsing for the public stock status
+#   - immutable, pre-compressed assets; no-cache index.html
+
+resolver ${NGINX_RESOLVER} valid=10s ipv6=off;
+resolver_timeout 2s;
+
+upstream api_upstream {
+    zone api_upstream 64k;
+    least_conn;
+    server ${API_UPSTREAM} resolve max_fails=3 fail_timeout=5s;
+    keepalive 256;
+    keepalive_timeout 60s;
+}
+
+limit_req_zone $binary_remote_addr zone=api_per_ip:20m rate=${NGINX_API_RATE};
+limit_req_zone $binary_remote_addr zone=checkout_per_ip:20m rate=${NGINX_CHECKOUT_RATE};
+limit_conn_zone $binary_remote_addr zone=conn_per_ip:20m;
+limit_req_status 429;
+limit_conn_status 429;
+limit_req_log_level warn;
+
+proxy_cache_path /var/cache/nginx/status levels=1:2 keys_zone=status_cache:10m
+                 max_size=64m inactive=30s use_temp_path=off;
+
+# Known scanners / scripted clients and empty user agents. Trivially spoofed,
+# so it is only the first, cheapest filter (rate limits + WAF do the rest).
+map $http_user_agent $bad_ua {
+    default 0;
+    ""      1;
+    "~*(sqlmap|nikto|nmap|masscan|zgrab|nuclei|python-requests|python-urllib|go-http-client|curl/|wget|libwww-perl|scrapy|headlesschrome)" 1;
+}
+map "${NGINX_BOT_FILTER}:$bad_ua" $block_bot {
+    default 0;
+    "1:1"   1;
+}
+
+server {
+    listen 8080 reuseport backlog=4096;
+    server_name _;
+    root /usr/share/nginx/html;
+
+    include /etc/nginx/snippets/security-headers.conf;
+
+    # Edge-generated errors are JSON too, so the client parses one format.
+    error_page 429 = @rate_limited;
+    error_page 403 = @forbidden;
+    error_page 502 503 504 = @upstream_unavailable;
+
+    location = /nginx-health {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # --- Checkout: strictest limits + bot filter ---------------------------
+    location ~ ^/api/v1/sales/[0-9]+/checkout$ {
+        if ($block_bot) {
+            return 403;
+        }
+        limit_req zone=checkout_per_ip burst=${NGINX_CHECKOUT_BURST} nodelay;
+        limit_req zone=api_per_ip burst=${NGINX_API_BURST} nodelay;
+        include /etc/nginx/snippets/proxy-api.conf;
+        proxy_read_timeout 10s;
+    }
+
+    # --- Live stock stream (SSE): unbuffered, long-lived ---------------------
+    location ~ ^/api/v1/sales/[0-9]+/events$ {
+        limit_conn conn_per_ip 4;
+        include /etc/nginx/snippets/proxy-api.conf;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+    }
+
+    # --- Public stock snapshot: 1 s micro-cache, misses collapsed -----------
+    # 100k pollers => ~1 upstream request per second per NGINX instance.
+    location ~ ^/api/v1/sales/[0-9]+/status$ {
+        limit_req zone=api_per_ip burst=${NGINX_API_BURST} nodelay;
+        include /etc/nginx/snippets/proxy-api.conf;
+        proxy_read_timeout 5s;
+        proxy_set_header Authorization "";
+        proxy_cache status_cache;
+        proxy_cache_key $uri;
+        proxy_cache_valid 200 1s;
+        proxy_cache_lock on;
+        proxy_cache_lock_timeout 2s;
+        proxy_cache_use_stale updating error timeout http_502 http_503;
+        proxy_cache_background_update on;
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header X-Cache-Status $upstream_cache_status always;
+    }
+
+    location /api/ {
+        limit_req zone=api_per_ip burst=${NGINX_API_BURST} nodelay;
+        include /etc/nginx/snippets/proxy-api.conf;
+        proxy_read_timeout 15s;
+    }
+
+    # --- Static SPA ------------------------------------------------------
+    location /assets/ {
+        gzip_static on;
+        access_log off;
+        try_files $uri =404;
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
+    location / {
+        gzip_static on;
+        try_files $uri /index.html;
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-cache" always;
+    }
+
+    # --- JSON error bodies -----------------------------------------------
+    location @rate_limited {
+        default_type application/json;
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Retry-After 1 always;
+        return 429 '{"error":{"code":"RATE_LIMITED","message":"Too many requests - retrying shortly."}}';
+    }
+
+    location @forbidden {
+        default_type application/json;
+        return 403 '{"error":{"code":"FORBIDDEN","message":"Request blocked."}}';
+    }
+
+    location @upstream_unavailable {
+        default_type application/json;
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Retry-After 2 always;
+        return 503 '{"error":{"code":"UPSTREAM_UNAVAILABLE","message":"Service busy - retrying shortly."}}';
+    }
+}

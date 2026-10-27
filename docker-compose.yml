@@ -1,0 +1,264 @@
+# Local flash-sale stack. `docker compose up -d` — no .env required.
+#
+#   browser ─► web (NGINX: SPA + rate limits + LB) ─► api ×3 ─► redis / rabbitmq
+#                                                          worker ×2 ◄─┘   └─► postgres
+#
+# Every ${VAR:-default} can be overridden from a .env file (see .env.example).
+
+name: ${COMPOSE_PROJECT_NAME:-flashsale}
+
+x-backend-env: &backend-env
+  APP_ENV: ${APP_ENV:-local}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-flash}:${POSTGRES_PASSWORD:-flash}@postgres:5432/${POSTGRES_DB:-flashsale}
+  REDIS_URL: redis://redis:6379/0
+  RABBITMQ_URL: amqp://${RABBITMQ_USER:-flash}:${RABBITMQ_PASSWORD:-flash}@rabbitmq:5672/
+  JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-change-me-0123456789abcdef}
+  JWT_EXPIRES_MINUTES: ${JWT_EXPIRES_MINUTES:-720}
+  ADMIN_API_KEY: ${ADMIN_API_KEY:-local-admin-key}
+  BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+  CLIENT_IP_TRUSTED_HOPS: "1"
+  WEB_CONCURRENCY: ${WEB_CONCURRENCY:-1}
+  RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+  RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-10}
+  RATE_LIMIT_CHECKOUT_PER_USER: ${RATE_LIMIT_CHECKOUT_PER_USER:-5}
+  RATE_LIMIT_CHECKOUT_PER_IP: ${RATE_LIMIT_CHECKOUT_PER_IP:-200}
+  RATE_LIMIT_AUTH_PER_IP: ${RATE_LIMIT_AUTH_PER_IP:-30}
+  WORKER_PREFETCH: ${WORKER_PREFETCH:-16}
+  WORKER_MAX_RETRIES: ${WORKER_MAX_RETRIES:-5}
+  WORKER_RETRY_DELAY_MS: ${WORKER_RETRY_DELAY_MS:-2000}
+  SEED_SALE_STOCK: ${SEED_SALE_STOCK:-500}
+  SEED_SALE_STARTS_IN_SECONDS: ${SEED_SALE_STARTS_IN_SECONDS:-120}
+  SEED_SALE_DURATION_MINUTES: ${SEED_SALE_DURATION_MINUTES:-60}
+
+x-backend: &backend
+  image: flashsale-backend:local
+  build:
+    context: ./backend
+    target: runtime
+  environment: *backend-env
+  restart: unless-stopped
+  init: true
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-flash}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flash}
+      POSTGRES_DB: ${POSTGRES_DB:-flashsale}
+    command:
+      - postgres
+      - -c
+      - max_connections=300
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - log_lock_waits=on
+      - -c
+      - deadlock_timeout=500ms
+    shm_size: 256mb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-55432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    # AOF persistence so the inventory token survives a restart, and
+    # noeviction so Redis can never silently evict it under memory pressure.
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory-policy
+      - noeviction
+    volumes:
+      - redisdata:/data
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-56379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-flash}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-flash}
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+      - ./observability/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    ports:
+      - "127.0.0.1:${RABBITMQ_HOST_PORT:-55672}:5672"
+      - "127.0.0.1:${RABBITMQ_MGMT_HOST_PORT:-15672}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  # One-shot: schema migrations + idempotent seed (+ Redis priming).
+  migrate:
+    <<: *backend
+    command: ["sh", "-c", "alembic upgrade head && python -m app.cli seed"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    deploy:
+      replicas: ${API_REPLICAS:-3}
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    ulimits:
+      nofile: { soft: 65536, hard: 65536 }
+    stop_grace_period: 25s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status != 200)"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "app.worker"]
+    deploy:
+      replicas: ${WORKER_REPLICAS:-2}
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    stop_grace_period: 30s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(urllib.request.urlopen('http://127.0.0.1:9100/metrics', timeout=2).status != 200)"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # NGINX: serves the SPA (pre-compressed, immutable assets) and is the local
+  # API gateway: load balancing, rate limiting, bot filter, micro-cache.
+  web:
+    image: flashsale-web:local
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      NGINX_API_RATE: ${NGINX_API_RATE:-100r/s}
+      NGINX_API_BURST: ${NGINX_API_BURST:-200}
+      NGINX_CHECKOUT_RATE: ${NGINX_CHECKOUT_RATE:-20r/s}
+      NGINX_CHECKOUT_BURST: ${NGINX_CHECKOUT_BURST:-40}
+      NGINX_BOT_FILTER: ${NGINX_BOT_FILTER:-1}
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    ulimits:
+      nofile: { soft: 65536, hard: 65536 }
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/nginx-health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # --- docker compose --profile test run --rm backend-tests ------------------
+  backend-tests:
+    profiles: ["test"]
+    build:
+      context: ./backend
+      target: test
+    environment:
+      <<: *backend-env
+      APP_ENV: test
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # --- docker compose --profile observability up -d ---------------------------
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheusdata:/prometheus
+    ports:
+      - "127.0.0.1:${PROMETHEUS_HOST_PORT:-59090}:9090"
+    restart: unless-stopped
+
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:12.1.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    ports:
+      - "127.0.0.1:${GRAFANA_HOST_PORT:-53000}:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  rabbitmqdata:
+  prometheusdata:
+  grafanadata:
