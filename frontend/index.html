@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Festival flash sale — 500 units of the Nova X Pro, one per customer." />
+    <meta name="theme-color" content="#0c0a14" />
+    <meta name="color-scheme" content="dark" />
+    <title>Flash Sale · Nova X Pro</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!--
+      Start fetching the sale while the JS bundle downloads, so the first
+      render already has data (the fetch() in the app reuses this response).
+    -->
+    <link rel="preload" href="/api/v1/sales/current" as="fetch" crossorigin="anonymous" />
+    <!--
+      Critical CSS for the app shell: the skeleton paints on the first frame,
+      before any JS runs, and occupies the same space as the real content.
+    -->
+    <style>
+      html { background: #0c0a14; color: #f5f3ff; }
+      body { margin: 0; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+      .boot { max-width: 1040px; margin: 0 auto; padding: 88px 20px 0; }
+      .boot-card { height: 460px; border-radius: 24px; background: linear-gradient(110deg, #17142a 30%, #211c3a 50%, #17142a 70%); background-size: 200% 100%; animation: boot 1.4s linear infinite; }
+      @keyframes boot { to { background-position: -200% 0; } }
+      @media (prefers-reduced-motion: reduce) { .boot-card { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <div id="root"><div class="boot" aria-hidden="true"><div class="boot-card"></div></div></div>
+    <noscript>This flash sale needs JavaScript enabled.</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
