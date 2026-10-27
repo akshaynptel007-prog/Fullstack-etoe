@@ -1,32 +1,41 @@
--- Sliding-window-log rate limiter.
+-- Sliding-window-log rate limiter over one or more identities (e.g. the
+-- client IP AND the user), checked atomically in a single round trip: the
+-- request is admitted only if EVERY window has room, and is then recorded in
+-- all of them. Rejected requests are not recorded, so each sorted set holds
+-- at most `limit` members — memory stays bounded even under a flood.
 --
--- Rejected requests are NOT recorded, so the sorted set never holds more than
--- `limit` members: memory per key is bounded even under a flood.
+-- KEYS[i]   rl:{group}:<scope>:<identity>   (shared hash tag: cluster safe)
+-- ARGV[1]   window in milliseconds
+-- ARGV[2]   unique member for this request
+-- ARGV[2+i] limit for KEYS[i]
 --
--- KEYS[1] rl:<scope>:<identity>
--- ARGV[1] limit (requests per window)
--- ARGV[2] window in milliseconds
--- ARGV[3] unique member for this request (request id)
---
--- Returns {allowed (1|0), remaining, retry_after_ms}
+-- Returns {allowed (1|0), denied_index (0 = none), remaining, retry_after_ms}
 
-local limit = tonumber(ARGV[1])
-local window = tonumber(ARGV[2])
+local window = tonumber(ARGV[1])
 local t = redis.call('TIME')
 local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
+local remaining = nil
 
-redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', now - window)
-local count = redis.call('ZCARD', KEYS[1])
-
-if count < limit then
-  redis.call('ZADD', KEYS[1], now, ARGV[3])
-  redis.call('PEXPIRE', KEYS[1], window)
-  return {1, limit - count - 1, 0}
+for i, key in ipairs(KEYS) do
+  local limit = tonumber(ARGV[2 + i])
+  redis.call('ZREMRANGEBYSCORE', key, '-inf', now - window)
+  local count = redis.call('ZCARD', key)
+  if count >= limit then
+    local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+    local retry_after = window
+    if oldest[2] then
+      retry_after = math.max(1, tonumber(oldest[2]) + window - now)
+    end
+    return {0, i, 0, retry_after}
+  end
+  local left = limit - count - 1
+  if remaining == nil or left < remaining then
+    remaining = left
+  end
 end
 
-local oldest = redis.call('ZRANGE', KEYS[1], 0, 0, 'WITHSCORES')
-local retry_after = window
-if oldest[2] then
-  retry_after = math.max(1, tonumber(oldest[2]) + window - now)
+for _, key in ipairs(KEYS) do
+  redis.call('ZADD', key, now, ARGV[2])
+  redis.call('PEXPIRE', key, window)
 end
-return {0, 0, retry_after}
+return {1, 0, remaining, 0}

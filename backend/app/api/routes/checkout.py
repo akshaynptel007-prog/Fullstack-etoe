@@ -4,6 +4,7 @@ from app.deps import ClientIpDep, ResourcesDep, UserIdDep, raise_if_limited
 from app.logging import request_id_var
 from app.models import OrderStatus
 from app.schemas import CheckoutAccepted, ErrorResponse
+from app.services.rate_limit import Limit
 
 router = APIRouter(tags=["checkout"])
 
@@ -29,22 +30,21 @@ async def checkout(
     response: Response,
 ) -> CheckoutAccepted:
     s = resources.settings
-    window_ms = s.rate_limit_window_seconds * 1000
-    limiter = resources.rate_limiter
-    # Per-IP first (cheap rejection of a single noisy source), then per-user
-    # (stops one account hammering from many IPs).
-    raise_if_limited(
-        await limiter.hit(
-            "checkout_ip", ip, limit=s.rate_limit_checkout_per_ip, window_ms=window_ms
-        ),
-        "checkout_ip",
-    )
-    raise_if_limited(
-        await limiter.hit(
-            "checkout_user", str(user_id), limit=s.rate_limit_checkout_per_user, window_ms=window_ms
-        ),
-        "checkout_user",
-    )
+    # Once this process has seen the sale sell out, skip rate limiting for a
+    # moment: >90% of spike traffic arrives after sell-out, and the reserve
+    # script alone answers it in one round trip (still returning an existing
+    # order to a user who already holds one).
+    if not resources.checkout.recently_sold_out(sale_id):
+        # Per-IP (one noisy source) and per-user (one account from many IPs),
+        # checked atomically in a single Redis call.
+        raise_if_limited(
+            await resources.rate_limiter.hit(
+                "checkout",
+                Limit("ip", ip, s.rate_limit_checkout_per_ip),
+                Limit("user", str(user_id), s.rate_limit_checkout_per_user),
+                window_ms=s.rate_limit_window_seconds * 1000,
+            )
+        )
 
     result = await resources.checkout.checkout(
         sale_id=sale_id, user_id=user_id, request_id=request_id_var.get()

@@ -9,6 +9,7 @@ happens asynchronously in the worker.
 """
 
 import logging
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -25,6 +26,10 @@ from app.services.order_status import OrderStatusStore
 from app.services.sales import SaleCache, SaleInfo, prime_sale
 
 log = logging.getLogger(__name__)
+
+# How long a process trusts "sold out" before asking Redis again. Short, so an
+# admin restock or a released reservation is picked up almost immediately.
+_SOLD_OUT_MEMO_SECONDS = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +54,10 @@ class CheckoutService:
         self._order_status = order_status
         self._sale_cache = sale_cache
         self._sessionmaker = sessionmaker
+        self._sold_out_until: dict[int, float] = {}
+
+    def recently_sold_out(self, sale_id: int) -> bool:
+        return self._sold_out_until.get(sale_id, 0.0) > time.monotonic()
 
     async def checkout(
         self, *, sale_id: int, user_id: uuid.UUID, request_id: str | None
@@ -69,6 +78,7 @@ class CheckoutService:
                 assert outcome.order_id is not None
                 return CheckoutResult(outcome.order_id, duplicate=True, remaining=outcome.remaining)
             case ReserveCode.SOLD_OUT:
+                self._sold_out_until[sale.id] = time.monotonic() + _SOLD_OUT_MEMO_SECONDS
                 raise AppError(409, "SOLD_OUT", "Sold out — all units have been reserved.")
             case ReserveCode.NOT_STARTED:
                 raise AppError(409, "SALE_NOT_STARTED", "The sale has not started yet.")

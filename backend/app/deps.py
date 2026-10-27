@@ -16,8 +16,13 @@ from app.services.rate_limit import RateLimitResult
 
 _bearer = HTTPBearer(auto_error=False)
 
+# Every dependency here is `async def` on purpose: FastAPI runs plain `def`
+# dependencies in a threadpool, which costs a thread hop (and GIL contention)
+# per dependency per request. None of these block, so they run inline on the
+# event loop — profiling showed the hops cost more than the Redis calls.
 
-def get_resources(request: Request) -> Resources:
+
+async def get_resources(request: Request) -> Resources:
     resources: Resources = request.app.state.resources
     return resources
 
@@ -33,7 +38,7 @@ async def get_session(resources: ResourcesDep) -> AsyncIterator[AsyncSession]:
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-def current_user_id(
+async def current_user_id(
     resources: ResourcesDep,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> uuid.UUID:
@@ -47,7 +52,7 @@ def current_user_id(
 UserIdDep = Annotated[uuid.UUID, Depends(current_user_id)]
 
 
-def require_admin(
+async def require_admin(
     resources: ResourcesDep, x_admin_key: Annotated[str | None, Header()] = None
 ) -> None:
     expected = resources.settings.admin_api_key.get_secret_value()
@@ -55,16 +60,16 @@ def require_admin(
         raise AppError(401, "ADMIN_AUTH_REQUIRED", "A valid X-Admin-Key header is required.")
 
 
-def request_ip(request: Request, resources: ResourcesDep) -> str:
+async def request_ip(request: Request, resources: ResourcesDep) -> str:
     return client_ip(request, resources.settings.client_ip_trusted_hops)
 
 
 ClientIpDep = Annotated[str, Depends(request_ip)]
 
 
-def raise_if_limited(result: RateLimitResult, scope: str) -> None:
+def raise_if_limited(result: RateLimitResult) -> None:
     if not result.allowed:
-        RATE_LIMITED.labels(scope).inc()
+        RATE_LIMITED.labels(result.denied_scope or "unknown").inc()
         raise AppError(
             429,
             "RATE_LIMITED",

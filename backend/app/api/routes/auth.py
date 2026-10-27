@@ -7,6 +7,7 @@ from app.errors import AppError
 from app.models import User
 from app.schemas import Credentials, TokenOut, UserOut
 from app.security import create_access_token, hash_password_async, verify_password_async
+from app.services.rate_limit import Limit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -14,9 +15,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def _limit_auth(resources: ResourcesDep, ip: str) -> None:
     s = resources.settings
     result = await resources.rate_limiter.hit(
-        "auth_ip", ip, limit=s.rate_limit_auth_per_ip, window_ms=60_000
+        "auth", Limit("ip", ip, s.rate_limit_auth_per_ip), window_ms=60_000
     )
-    raise_if_limited(result, "auth_ip")
+    raise_if_limited(result)
 
 
 def _token_response(user: User, resources: ResourcesDep) -> TokenOut:
