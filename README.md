@@ -238,6 +238,22 @@ Details: [docs/frontend-performance.md](docs/frontend-performance.md).
 
 ## AWS deployment
 
+### Free-plan demo (single host)
+
+The deployed demo uses a deliberately small, single-EC2 layout so it can run within an active
+AWS Free plan credit allowance. It keeps the application flow intact: CloudFront → NGINX → two
+stateless API containers → Redis/RabbitMQ → a worker → PostgreSQL. PostgreSQL, Redis, RabbitMQ,
+the API, worker, and web gateway all share one EC2 host; they are **not** separate managed or
+high-availability services in this demo.
+
+![AWS free-plan demo architecture](docs/architecture-free-demo.svg)
+
+The diagram shows the deployed demo, not the horizontally scaled reference design above. The
+larger ECS/Fargate, ALB, WAF, RDS, ElastiCache, and Amazon MQ design below is the production-shaped
+Terraform architecture. The demo does not establish the case-study target of 100,000 concurrent
+requests in 10 seconds. See [docs/deployment-free-demo.md](docs/deployment-free-demo.md) for setup,
+scope, and cleanup instructions.
+
 ```bash
 aws sts get-caller-identity   # be logged in
 ./scripts/deploy.sh           # ≈20 min first run; re-runs are incremental

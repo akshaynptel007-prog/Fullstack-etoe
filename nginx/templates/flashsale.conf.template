@@ -55,6 +55,12 @@ server {
     server_name _;
     root /usr/share/nginx/html;
 
+    # The free-plan demo origin is reachable only through CloudFront. The
+    # distribution adds this private header; direct origin requests are denied.
+    if ($http_x_origin_verify != "${ORIGIN_VERIFY}") {
+        return 403;
+    }
+
     include /etc/nginx/snippets/security-headers.conf;
 
     # Edge-generated errors are JSON too, so the client parses one format.

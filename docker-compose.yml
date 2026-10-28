@@ -198,6 +198,7 @@ services:
       NGINX_CHECKOUT_BURST: ${NGINX_CHECKOUT_BURST:-40}
       NGINX_BOT_FILTER: ${NGINX_BOT_FILTER:-1}
       NGINX_ACCESS_LOG: ${NGINX_ACCESS_LOG:-all}
+      ORIGIN_VERIFY: ${ORIGIN_VERIFY:-}
     ports:
       - "${WEB_PORT:-8080}:8080"
     ulimits:
@@ -206,7 +207,9 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/nginx-health"]
+      test:
+        - CMD-SHELL
+        - 'wget -qO- --header="X-Origin-Verify: $$ORIGIN_VERIFY" http://127.0.0.1:8080/nginx-health >/dev/null'
       interval: 5s
       timeout: 3s
       retries: 10

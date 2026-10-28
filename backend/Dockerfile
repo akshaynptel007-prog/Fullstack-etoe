@@ -32,6 +32,7 @@ RUN groupadd --system --gid 10001 app \
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY scripts ./scripts
+RUN chmod 0755 ./scripts/start-api.sh
 COPY app ./app
 
 # --- test image: `docker compose --profile test run backend-tests` -------------

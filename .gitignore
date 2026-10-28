@@ -37,6 +37,8 @@ crash.log
 crash.*.log
 tfplan
 *.tfplan
+infra/free-demo/plan.txt
+infra/free-demo/source.zip
 override.tf
 override.tf.json
 *_override.tf

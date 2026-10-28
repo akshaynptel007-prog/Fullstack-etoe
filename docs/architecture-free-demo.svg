@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1020" viewBox="0 0 1600 1020" role="img" aria-labelledby="title desc">
+  <title id="title">FlashSale AWS free-plan demo architecture</title>
+  <desc id="desc">CloudFront routes shopper traffic to a single EC2 host. Docker Compose runs the NGINX web gateway, two stateless API replicas, Redis, RabbitMQ, one worker, and PostgreSQL. Terraform provisions CloudFront, EC2, an origin-only security group, and a private encrypted S3 source archive.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#58708d"/></marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#2563eb"/></marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#16856a"/></marker>
+    <style>
+      .title{font:700 30px Inter,Segoe UI,Arial,sans-serif;fill:#15243a}.sub{font:15px Inter,Segoe UI,Arial,sans-serif;fill:#52657d}
+      .lane{fill:#f5f8fc;stroke:#d9e2ef;stroke-width:1.5}.laneTitle{font:700 14px Inter,Segoe UI,Arial,sans-serif;letter-spacing:1.1px;fill:#60738c}
+      .box{fill:#fff;stroke:#aabbd0;stroke-width:1.5;rx:12}.edge{fill:#eaf2ff;stroke:#6e9cec}.compute{fill:#fff;stroke:#7790ad}.app{fill:#eef5ff;stroke:#7da5dd}.data{fill:#edf8f3;stroke:#61a88c}.ops{fill:#f3efff;stroke:#9782d4}.boxTitle{font:700 16px Inter,Segoe UI,Arial,sans-serif;fill:#172b45}.boxText{font:13px Inter,Segoe UI,Arial,sans-serif;fill:#52657d}.small{font:12px Inter,Segoe UI,Arial,sans-serif;fill:#61748b}
+      .flow{fill:none;stroke:#58708d;stroke-width:2.5;marker-end:url(#arrow)}.flowBlue{fill:none;stroke:#2563eb;stroke-width:2.8;marker-end:url(#arrowBlue)}.flowGreen{fill:none;stroke:#16856a;stroke-width:2.5;marker-end:url(#arrowGreen)}.dashed{fill:none;stroke:#8c79c6;stroke-width:2;stroke-dasharray:7 6;marker-end:url(#arrow)}
+      .label{font:12px Inter,Segoe UI,Arial,sans-serif;fill:#52657d}.pill{fill:#e7edf5;rx:9}.footer{font:13px Inter,Segoe UI,Arial,sans-serif;fill:#344a63}
+    </style>
+  </defs>
+  <rect width="1600" height="1020" fill="#fff"/>
+  <text x="64" y="62" class="title">FlashSale · AWS free-plan demo</text>
+  <text x="64" y="91" class="sub">One EC2 host runs the full application stack; CloudFront is the public HTTPS edge.</text>
+
+  <rect x="54" y="126" width="1492" height="586" rx="18" class="lane"/>
+  <text x="80" y="158" class="laneTitle">SHOPPER TRAFFIC · PUBLIC HTTPS → PRIVATE ORIGIN ACCESS</text>
+
+  <!-- Client and edge -->
+  <rect x="82" y="252" width="190" height="124" class="box edge"/>
+  <text x="104" y="284" class="boxTitle">Shopper browser</text>
+  <text x="104" y="310" class="boxText">React storefront</text>
+  <text x="104" y="332" class="boxText">Buy · stock · order status</text>
+  <text x="104" y="354" class="small">HTTPS</text>
+
+  <rect x="350" y="234" width="250" height="160" class="box edge"/>
+  <text x="374" y="267" class="boxTitle">Amazon CloudFront</text>
+  <text x="374" y="294" class="boxText">Public TLS endpoint</text>
+  <text x="374" y="317" class="boxText">Static assets: cache policy</text>
+  <text x="374" y="340" class="boxText">/api/*: caching disabled</text>
+  <text x="374" y="365" class="small">Adds private origin verification header</text>
+
+  <!-- EC2 host -->
+  <rect x="687" y="181" width="806" height="475" rx="17" fill="#fff" stroke="#9aabc0" stroke-width="2"/>
+  <text x="714" y="216" class="boxTitle">Amazon EC2 · ap-south-1 · one host</text>
+  <text x="714" y="240" class="boxText">Security group accepts TCP 8080 only from CloudFront origin-facing addresses</text>
+  <rect x="713" y="260" width="754" height="365" rx="13" fill="#f8fafc" stroke="#d9e2ef"/>
+  <text x="738" y="289" class="laneTitle">DOCKER COMPOSE SERVICES</text>
+
+  <rect x="748" y="326" width="178" height="94" class="box compute"/>
+  <text x="768" y="357" class="boxTitle">NGINX web</text>
+  <text x="768" y="382" class="boxText">Serves SPA · proxies API</text>
+  <text x="768" y="402" class="small">Rate limits · origin check</text>
+
+  <rect x="1000" y="316" width="177" height="66" class="box app"/>
+  <text x="1021" y="344" class="boxTitle">FastAPI · replica 1</text>
+  <text x="1021" y="365" class="small">Stateless async API</text>
+  <rect x="1000" y="397" width="177" height="66" class="box app"/>
+  <text x="1021" y="425" class="boxTitle">FastAPI · replica 2</text>
+  <text x="1021" y="446" class="small">Checkout · status · SSE</text>
+
+  <rect x="1240" y="311" width="187" height="76" class="box data"/>
+  <text x="1260" y="342" class="boxTitle">Redis</text>
+  <text x="1260" y="365" class="boxText">Lua inventory gate · limits</text>
+  <rect x="1240" y="414" width="187" height="76" class="box data"/>
+  <text x="1260" y="445" class="boxTitle">RabbitMQ</text>
+  <text x="1260" y="468" class="boxText">Durable order hand-off</text>
+
+  <rect x="1000" y="518" width="177" height="72" class="box app"/>
+  <text x="1021" y="549" class="boxTitle">Order worker</text>
+  <text x="1021" y="573" class="boxText">Sequential DB writes</text>
+  <rect x="1240" y="518" width="187" height="72" class="box data"/>
+  <text x="1260" y="549" class="boxTitle">PostgreSQL</text>
+  <text x="1260" y="573" class="boxText">Orders · stock authority</text>
+
+  <!-- Request and data paths -->
+  <path d="M272 314H350" class="flowBlue"/><text x="283" y="300" class="label">HTTPS</text>
+  <path d="M600 314H748" class="flowBlue"/><text x="626" y="299" class="label">HTTPS + private header</text>
+  <path d="M926 359H1000" class="flow"/><text x="934" y="346" class="label">/api/*</text>
+  <path d="M1177 348H1240" class="flowGreen"/><text x="1183" y="334" class="label">reserve + status</text>
+  <path d="M1177 432H1240" class="flowGreen"/><text x="1185" y="418" class="label">publish winner</text>
+  <path d="M1333 490V518H1177" class="flowGreen"/><text x="1338" y="507" class="label">consume</text>
+  <path d="M1177 554H1240" class="flowGreen"/><text x="1180" y="541" class="label">conditional update</text>
+  <path d="M1087 518V463" class="flow"/><text x="1096" y="497" class="label">final status</text>
+  <path d="M1240 567H1210V477H1177" class="flow"/><text x="1185" y="504" class="label">fallback lookup</text>
+
+  <!-- Provisioning lane -->
+  <rect x="54" y="747" width="1492" height="207" rx="18" class="lane"/>
+  <text x="80" y="780" class="laneTitle">PROVISIONING · TERRAFORM BOOTSTRAPS THE DEMO</text>
+  <rect x="91" y="816" width="258" height="94" class="box ops"/>
+  <text x="115" y="848" class="boxTitle">Terraform</text>
+  <text x="115" y="873" class="boxText">CloudFront · EC2 · SG · IAM</text>
+  <text x="115" y="894" class="small">Encrypted storage · SSM access</text>
+  <rect x="461" y="816" width="280" height="94" class="box ops"/>
+  <text x="485" y="848" class="boxTitle">Private S3 source archive</text>
+  <text x="485" y="873" class="boxText">Encrypted · public access blocked</text>
+  <text x="485" y="894" class="small">Temporary object lifecycle: 1 day</text>
+  <rect x="917" y="816" width="505" height="94" class="box ops"/>
+  <text x="941" y="848" class="boxTitle">EC2 bootstrap</text>
+  <text x="941" y="873" class="boxText">Downloads source with instance role → builds images → starts Compose stack</text>
+  <text x="941" y="894" class="small">Runtime secrets are generated on the host and kept in a mode-0600 .env file</text>
+  <path d="M349 863H461" class="dashed"/><text x="369" y="847" class="label">upload archive</text>
+  <path d="M741 863H917" class="dashed"/><text x="778" y="847" class="label">instance role downloads</text>
+  <path d="M220 816V694H1087V656" class="dashed"/><text x="236" y="727" class="label">provisions</text>
+  <path d="M1087 816V711H1090V656" class="dashed"/><text x="1102" y="735" class="label">builds and starts stack</text>
+
+  <rect x="54" y="972" width="1492" height="32" class="pill"/>
+  <text x="75" y="993" class="footer">Scope: demo / single host, no managed database, cache, queue, load balancer, or multi-AZ failover. The production reference architecture is documented separately.</text>
+</svg>

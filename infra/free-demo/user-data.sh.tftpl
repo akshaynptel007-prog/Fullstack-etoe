@@ -1,0 +1,73 @@
+#!/bin/bash
+set -Eeuo pipefail
+exec > >(tee -a /var/log/flashsale-free-demo-bootstrap.log) 2>&1
+
+REGION='${aws_region}'
+SOURCE_BUCKET='${source_bucket}'
+SOURCE_KEY='${source_key}'
+ORIGIN_VERIFY='${origin_verify}'
+PACKAGE_SHA256='${package_sha256}'
+
+dnf update -y
+dnf install -y docker unzip gzip tar
+systemctl enable --now docker
+
+COMPOSE_VERSION='v5.6.1'
+COMPOSE_DIR='/usr/local/lib/docker/cli-plugins'
+mkdir -p "$COMPOSE_DIR"
+curl -fsSL "https://github.com/docker/compose/releases/download/$${COMPOSE_VERSION}/checksums.txt" -o /tmp/compose-checksums.txt
+curl -fsSL "https://github.com/docker/compose/releases/download/$${COMPOSE_VERSION}/docker-compose-linux-x86_64" -o "$COMPOSE_DIR/docker-compose"
+EXPECTED_SHA256="$(grep 'docker-compose-linux-x86_64$' /tmp/compose-checksums.txt | awk '{print $1}')"
+printf '%s  %s\n' "$EXPECTED_SHA256" "$COMPOSE_DIR/docker-compose" | sha256sum --check --status
+chmod 0755 "$COMPOSE_DIR/docker-compose"
+
+BUILDX_VERSION='v0.17.1'
+curl -fsSL "https://github.com/docker/buildx/releases/download/$${BUILDX_VERSION}/checksums.txt" -o /tmp/buildx-checksums.txt
+curl -fsSL "https://github.com/docker/buildx/releases/download/$${BUILDX_VERSION}/buildx-$${BUILDX_VERSION}.linux-amd64" -o "$COMPOSE_DIR/docker-buildx"
+EXPECTED_BUILDX_SHA256="$(grep "buildx-$${BUILDX_VERSION}\.linux-amd64$" /tmp/buildx-checksums.txt | awk '{print $1}')"
+printf '%s  %s\n' "$EXPECTED_BUILDX_SHA256" "$COMPOSE_DIR/docker-buildx" | sha256sum --check --status
+chmod 0755 "$COMPOSE_DIR/docker-buildx"
+
+mkdir -p /opt/flashsale
+aws s3 cp "s3://$${SOURCE_BUCKET}/$${SOURCE_KEY}" /tmp/flashsale-source.zip --region "$REGION"
+printf '%s  %s\n' "$PACKAGE_SHA256" /tmp/flashsale-source.zip | sha256sum --check --status
+unzip -oq /tmp/flashsale-source.zip -d /opt/flashsale
+rm -f /tmp/flashsale-source.zip /tmp/compose-checksums.txt /tmp/buildx-checksums.txt
+cd /opt/flashsale
+
+POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+RABBITMQ_PASSWORD="$(openssl rand -hex 24)"
+JWT_SECRET="$(openssl rand -hex 32)"
+ADMIN_API_KEY="$(openssl rand -hex 32)"
+cat > /opt/flashsale/.env <<EOF
+APP_ENV=production
+POSTGRES_USER=flash
+POSTGRES_PASSWORD=$${POSTGRES_PASSWORD}
+POSTGRES_DB=flashsale
+RABBITMQ_USER=flash
+RABBITMQ_PASSWORD=$${RABBITMQ_PASSWORD}
+JWT_SECRET=$${JWT_SECRET}
+ADMIN_API_KEY=$${ADMIN_API_KEY}
+CLIENT_IP_TRUSTED_HOPS=2
+WEB_PORT=8080
+API_REPLICAS=2
+WORKER_REPLICAS=1
+WORKER_PREFETCH=1
+RATE_LIMIT_ENABLED=true
+NGINX_API_RATE=1000r/s
+NGINX_API_BURST=2000
+NGINX_CHECKOUT_RATE=200r/s
+NGINX_CHECKOUT_BURST=500
+NGINX_ACCESS_LOG=errors
+ORIGIN_VERIFY=$${ORIGIN_VERIFY}
+SEED_SALE_STOCK=500
+SEED_SALE_STARTS_IN_SECONDS=120
+SEED_SALE_DURATION_MINUTES=60
+EOF
+chmod 0600 /opt/flashsale/.env
+
+docker compose -f docker-compose.yml -f docker-compose.aws-demo.yml build api
+docker compose -f docker-compose.yml -f docker-compose.aws-demo.yml build web
+docker compose -f docker-compose.yml -f docker-compose.aws-demo.yml up -d --wait
+docker image prune -f
+echo 'Flash-sale demo containers started.'

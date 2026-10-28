@@ -1,0 +1,19 @@
+# One EC2 host demo profile. It preserves the Redis/RabbitMQ/PostgreSQL flow,
+# while keeping the host small enough for the AWS Free plan credit allowance.
+services:
+  api:
+    deploy:
+      replicas: 2
+
+  worker:
+    deploy:
+      replicas: 1
+
+  web:
+    environment:
+      NGINX_API_RATE: ${NGINX_API_RATE:-1000r/s}
+      NGINX_API_BURST: ${NGINX_API_BURST:-2000}
+      NGINX_CHECKOUT_RATE: ${NGINX_CHECKOUT_RATE:-200r/s}
+      NGINX_CHECKOUT_BURST: ${NGINX_CHECKOUT_BURST:-500}
+      NGINX_ACCESS_LOG: ${NGINX_ACCESS_LOG:-errors}
+      ORIGIN_VERIFY: ${ORIGIN_VERIFY:?ORIGIN_VERIFY is required for the AWS demo}
