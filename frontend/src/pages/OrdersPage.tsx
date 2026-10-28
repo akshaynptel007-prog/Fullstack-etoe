@@ -9,6 +9,7 @@ import { Spinner } from '../components/Spinner'
 import { useOrderPolling } from '../hooks/useOrderPolling'
 import { formatMoney, formatTime } from '../lib/format'
 import { useAuthStore } from '../store/auth'
+import { PageBackLink } from '../components/PageBackLink'
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   PENDING: 'Confirming…',
@@ -44,20 +45,38 @@ function OrderTracker({ orderId }: { orderId: string }) {
           <Spinner /> Confirming your order…
         </p>
       )}
-      <Link href="/orders">All my orders</Link>
     </section>
   )
 }
 
 function OrderList() {
+  const token = useAuthStore((s) => s.token)
   const [orders, setOrders] = useState<OrderListItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
-    api
-      .orders()
-      .then(({ data }) => setOrders(data))
-      .catch((e: unknown) => setError(e instanceof ApiError ? e.message : 'Could not load orders.'))
-  }, [])
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const load = async () => {
+      try {
+        const { data } = await api.orders()
+        if (cancelled) return
+        setOrders(data)
+        setError(null)
+        if (data.some((order) => order.status === 'PENDING')) {
+          timer = setTimeout(load, 1500)
+        }
+      } catch (e) {
+        if (cancelled) return
+        setError(e instanceof ApiError ? e.message : 'Could not load orders.')
+        timer = setTimeout(load, 3000)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
+  }, [token])
 
   if (error) return <div className="notice notice-err">{error}</div>
   if (!orders) return <Spinner />
@@ -93,10 +112,12 @@ function OrderList() {
 
 export default function OrdersPage() {
   const params = useParams<{ id?: string }>()
+  const token = useAuthStore((s) => s.token)
   const signedIn = useAuthStore((s) => s.token !== null)
   if (!signedIn) {
     return (
       <main className="page narrow">
+        <PageBackLink href="/" label="Back to sale" />
         <h1>My orders</h1>
         <AuthPanel />
       </main>
@@ -104,10 +125,11 @@ export default function OrdersPage() {
   }
   return (
     <main className="page narrow">
-      {params.id ? <OrderTracker orderId={params.id} /> : (
+      <PageBackLink href={params.id ? '/orders' : '/'} label={params.id ? 'My orders' : 'Back to sale'} />
+      {params.id ? <OrderTracker key={`${token}:${params.id}`} orderId={params.id} /> : (
         <section className="card">
           <h1>My orders</h1>
-          <OrderList />
+        <OrderList key={token} />
         </section>
       )}
     </main>

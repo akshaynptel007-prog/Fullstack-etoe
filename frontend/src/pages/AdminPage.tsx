@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useState } from 'react'
+import { Link } from 'wouter'
 
 import { ApiError } from '../api/client'
 import { api } from '../api/endpoints'
@@ -8,7 +9,7 @@ import { useSaleStore } from '../store/sale'
 
 const KEY = 'flashsale.adminKey'
 
-/** Demo console: watch the inventory invariants live and reset the sale. */
+/** Admin console: monitor inventory invariants and reset the sale. */
 export default function AdminPage() {
   const sale = useSaleStore((s) => s.sale)
   const [adminKey, setAdminKey] = useState(() => readStorage('session', KEY) ?? '')
@@ -36,12 +37,13 @@ export default function AdminPage() {
     if (!sale) return
     const form = new FormData(event.currentTarget)
     try {
-      await api.adminReset(sale.id, adminKey, {
+      const { data: updatedSale } = await api.adminReset(sale.id, adminKey, {
         stock: Number(form.get('stock')),
         starts_in_seconds: Number(form.get('starts_in')),
         duration_minutes: Number(form.get('duration')),
       })
-      setMessage('Sale reset. Reload the sale page to see the new countdown.')
+      useSaleStore.getState().setSale(updatedSale)
+      setMessage('Sale schedule and inventory updated.')
     } catch (e) {
       setMessage(e instanceof ApiError ? e.message : String(e))
     }
@@ -49,6 +51,7 @@ export default function AdminPage() {
 
   return (
     <main className="page narrow">
+      <Link href="/" className="page-back">← Back to sale</Link>
       <section className="card">
         <h1>Sale console</h1>
         <label>

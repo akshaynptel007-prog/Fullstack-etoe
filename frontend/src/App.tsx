@@ -5,6 +5,7 @@ import { ApiError } from './api/client'
 import { api } from './api/endpoints'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Header } from './components/Header'
+import { PageBackLink } from './components/PageBackLink'
 import { Spinner } from './components/Spinner'
 import { useServerClock } from './hooks/useServerClock'
 import SalePage from './pages/SalePage'
@@ -54,12 +55,13 @@ export function App() {
           <Route path="/admin" component={AdminPage} />
           <Route>
             <main className="page">
+              <PageBackLink href="/" label="Home" />
               <p>Page not found.</p>
             </main>
           </Route>
         </Switch>
       </Suspense>
-      <footer className="footer">Prices include GST · One unit per customer · Demo storefront</footer>
+      <footer className="footer">Prices include GST · One unit per customer · FlashSale reference application</footer>
     </ErrorBoundary>
   )
 }

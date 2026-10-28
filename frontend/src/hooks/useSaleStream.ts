@@ -26,7 +26,7 @@ export function pollIntervalMs(status: SaleStatus | null, now: number): number |
  * falls back to adaptive polling of the micro-cached status endpoint and
  * periodically tries SSE again.
  */
-export function useSaleStream(saleId: number | undefined): void {
+export function useSaleStream(saleId: number | undefined, scheduleKey?: string): void {
   useEffect(() => {
     if (saleId === undefined) return
     const { setStatus, setLiveMode } = useSaleStore.getState()
@@ -106,5 +106,5 @@ export function useSaleStream(saleId: number | undefined): void {
       controller.abort()
       source?.close()
     }
-  }, [saleId])
+  }, [saleId, scheduleKey])
 }

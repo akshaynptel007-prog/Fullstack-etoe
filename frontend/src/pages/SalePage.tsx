@@ -30,7 +30,8 @@ export default function SalePage() {
   const now = useServerNow(250)
   const { phase, buy } = useCheckout(sale?.id)
 
-  useSaleStream(sale?.id)
+  const scheduleKey = sale ? `${sale.starts_at}:${sale.ends_at}:${sale.total_stock}` : undefined
+  useSaleStream(sale?.id, scheduleKey)
 
   // Pre-fetch the order-tracking chunk while the browser is idle, so the
   // post-purchase screen is instant even under load.

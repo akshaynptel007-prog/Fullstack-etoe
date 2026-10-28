@@ -26,7 +26,13 @@ export const useSaleStore = create<SaleStoreState>()((set) => ({
   clockOffsetMs: 0,
   liveMode: 'connecting',
   optimisticHold: 0,
-  setSale: (sale) => set({ sale }),
+  setSale: (sale) =>
+    set({
+      sale,
+      status: null,
+      liveMode: 'connecting',
+      optimisticHold: 0,
+    }),
   setStatus: (status) =>
     set((s) => {
       // Ignore out-of-order snapshots (SSE + polling can briefly overlap).

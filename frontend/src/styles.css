@@ -94,6 +94,20 @@ input {
   gap: 1.25rem;
 }
 
+.page-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+  color: var(--muted);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.page-back:hover {
+  color: var(--text);
+}
+
 .nav a {
   color: var(--muted);
   text-decoration: none;
