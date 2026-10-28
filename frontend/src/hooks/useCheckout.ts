@@ -18,9 +18,12 @@ import { useSingleFlight } from './useSingleFlight'
 export function useCheckout(saleId: number | undefined) {
   const phase = useCheckoutStore((s) => s.phase)
   const setPhase = useCheckoutStore((s) => s.setPhase)
+  const sessionToken = useAuthStore((s) => s.token)
 
   const buy = useSingleFlight(async () => {
     if (saleId === undefined) return
+    const token = useAuthStore.getState().token
+    if (!token) return
     const { hold, releaseHold } = useSaleStore.getState()
     setPhase({ kind: 'submitting', attempt: 0 })
     hold() // optimistic: show our unit as taken immediately
@@ -29,11 +32,15 @@ export function useCheckout(saleId: number | undefined) {
         retries: 4,
         baseMs: 500,
         maxMs: 4000,
-        onRetry: (attempt, delayMs) =>
-          setPhase({ kind: 'submitting', attempt, retryInMs: delayMs }),
+        onRetry: (attempt, delayMs) => {
+          if (useAuthStore.getState().token !== token) return
+          setPhase({ kind: 'submitting', attempt, retryInMs: delayMs })
+        },
       })
+      if (useAuthStore.getState().token !== token) return
       setPhase({ kind: 'queued', orderId: data.order_id, since: Date.now() })
     } catch (error) {
+      if (useAuthStore.getState().token !== token) return
       const e = error instanceof ApiError ? error : new ApiError(0, 'UNKNOWN', String(error))
       if (e.code === 'SOLD_OUT') {
         setPhase({ kind: 'sold_out' })
@@ -46,20 +53,26 @@ export function useCheckout(saleId: number | undefined) {
         setPhase({ kind: 'error', message: e.message, retryable: e.retryable || e.status === 409 })
       }
     } finally {
-      releaseHold() // the server's own counter now reflects the reservation
+      if (useAuthStore.getState().token === token) {
+        releaseHold() // the server's own counter now reflects the reservation
+      }
     }
-  }, 300)
+  }, 300, sessionToken)
 
   const onResolved = useCallback(
     (order: Order) => {
+      if (useAuthStore.getState().token !== sessionToken) return
       if (order.status === 'PENDING') return
       setPhase({ kind: 'done', orderId: order.order_id, status: order.status })
     },
-    [setPhase],
+    [sessionToken, setPhase],
   )
   const onPollError = useCallback(
-    (error: ApiError) => setPhase({ kind: 'error', message: error.message, retryable: false }),
-    [setPhase],
+    (error: ApiError) => {
+      if (useAuthStore.getState().token !== sessionToken) return
+      setPhase({ kind: 'error', message: error.message, retryable: false })
+    },
+    [sessionToken, setPhase],
   )
   useOrderPolling(phase.kind === 'queued' ? phase.orderId : null, onResolved, onPollError)
 

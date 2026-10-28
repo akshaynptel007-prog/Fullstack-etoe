@@ -11,10 +11,13 @@ import { useCallback, useLayoutEffect, useRef } from 'react'
 export function useSingleFlight<Args extends unknown[]>(
   action: (...args: Args) => Promise<void>,
   minIntervalMs = 0,
+  scopeKey?: unknown,
 ): (...args: Args) => Promise<void> {
   const busy = useRef(false)
   const lastFinished = useRef(0)
   const actionRef = useRef(action)
+  const scopeRef = useRef(scopeKey)
+  const flightRef = useRef(0)
 
   useLayoutEffect(() => {
     actionRef.current = action
@@ -22,16 +25,27 @@ export function useSingleFlight<Args extends unknown[]>(
 
   return useCallback(
     async (...args: Args) => {
+      if (!Object.is(scopeRef.current, scopeKey)) {
+        scopeRef.current = scopeKey
+        flightRef.current += 1
+        busy.current = false
+        lastFinished.current = 0
+      }
       if (busy.current) return
       if (minIntervalMs > 0 && performance.now() - lastFinished.current < minIntervalMs) return
+      const flight = ++flightRef.current
       busy.current = true
       try {
         await actionRef.current(...args)
       } finally {
-        busy.current = false
-        lastFinished.current = performance.now()
+        // A prior account's request must not unlock or throttle the new
+        // account's independent checkout flight when it finally settles.
+        if (flight === flightRef.current) {
+          busy.current = false
+          lastFinished.current = performance.now()
+        }
       }
     },
-    [minIntervalMs],
+    [minIntervalMs, scopeKey],
   )
 }

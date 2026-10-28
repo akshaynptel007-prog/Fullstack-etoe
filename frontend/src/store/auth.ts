@@ -2,8 +2,15 @@ import { create } from 'zustand'
 
 import type { User } from '../api/types'
 import { readStorage, writeStorage } from '../lib/storage'
+import { useCheckoutStore } from './checkout'
+import { useSaleStore } from './sale'
 
 const KEY = 'flashsale.session'
+
+function resetAccountState(): void {
+  useCheckoutStore.getState().reset()
+  useSaleStore.getState().releaseHold()
+}
 
 interface Session {
   token: string
@@ -37,10 +44,12 @@ export const useAuthStore = create<AuthState>()((set) => ({
   signIn: (token, user, expiresInSeconds) => {
     const session: Session = { token, user, expiresAt: Date.now() + expiresInSeconds * 1000 }
     writeStorage('local', KEY, JSON.stringify(session))
+    resetAccountState()
     set({ token, user })
   },
   signOut: () => {
     writeStorage('local', KEY, null)
+    resetAccountState()
     set({ token: null, user: null })
   },
 }))
