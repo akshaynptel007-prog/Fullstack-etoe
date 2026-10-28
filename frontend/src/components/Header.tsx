@@ -10,9 +10,6 @@ export function Header() {
   return (
     <header className="header">
       <Link href="/" className="brand" aria-label="Flash Sale home">
-        <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
-          <path d="M18 3 7 18h7l-2 11 11-15h-7z" fill="currentColor" />
-        </svg>
         <span>FlashSale</span>
       </Link>
       <nav className="nav">

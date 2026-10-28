@@ -78,15 +78,12 @@ input {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  font-weight: 800;
-  font-size: 1.12rem;
+  gap: 0.35rem;
+  font-weight: 700;
+  font-size: 1.22rem;
+  letter-spacing: -0.03em;
   color: #fff;
   text-decoration: none;
-}
-
-.brand svg {
-  color: var(--accent-1);
 }
 
 .nav {
@@ -163,10 +160,10 @@ input {
 /* --- Product page -------------------------------------------------------- */
 .product-layout {
   display: grid;
-  grid-template-columns: minmax(250px, 0.95fr) minmax(280px, 1.2fr) minmax(240px, 280px);
-  gap: 28px;
-  align-items: start;
-  background: var(--surface);
+  grid-template-columns: minmax(270px, 1.05fr) minmax(280px, 1.2fr) minmax(240px, 280px);
+  gap: 30px;
+  align-items: center;
+  background: linear-gradient(120deg, #fff 0%, #fff 58%, #f4f8fb 100%);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 24px;
@@ -174,18 +171,35 @@ input {
 }
 
 .product-media {
+  position: relative;
   display: grid;
   place-items: center;
-  min-height: 410px;
+  min-height: 450px;
   overflow: hidden;
-  border: 1px solid #e0e7ed;
-  border-radius: 6px;
-  background: var(--gradient);
+  border: 1px solid #d7e3ec;
+  border-radius: 8px;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgb(255 255 255 / 0.75), transparent 52%),
+    linear-gradient(145deg, #dce9f4 0%, #b8d1e2 52%, #e5eff5 100%);
+}
+
+.product-media::after {
+  position: absolute;
+  right: 12%;
+  bottom: 12%;
+  left: 12%;
+  height: 18px;
+  border-radius: 50%;
+  background: rgb(29 65 89 / 0.18);
+  filter: blur(12px);
+  content: '';
 }
 
 .phone-art {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  max-width: 235px;
+  max-width: 225px;
   height: auto;
   filter: drop-shadow(0 22px 28px rgb(31 56 78 / 0.2));
 }
@@ -708,7 +722,7 @@ input {
 }
 
 /* --- Responsive ---------------------------------------------------------- */
-@media (max-width: 760px) {
+@media (max-width: 960px) {
   .product-layout {
     grid-template-columns: minmax(200px, 0.85fr) minmax(0, 1fr);
     gap: 20px;
