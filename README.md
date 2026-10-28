@@ -1,5 +1,7 @@
 # FlashSale — flash-sale checkout reference architecture
 
+**Live website:** [Open FlashSale](https://d336phx1gw37na.cloudfront.net/)
+
 A production-shaped reference implementation of the **festival flash-sale case study**: a limited
 batch of **500 smartphones** goes live at **8:00 PM**, and **100,000+ checkout requests** arrive in
 the first 10 seconds. Earlier trial runs suffered high latency, row-lock timeouts, API timeouts and
