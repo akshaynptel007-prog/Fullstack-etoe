@@ -13,6 +13,8 @@ interface Props {
 
 function label(props: Props): { text: string; enabled: boolean; busy: boolean } {
   const { saleState, signedIn, phase, priceLabel } = props
+  if (phase.kind === 'checking')
+    return { text: 'Checking your orders…', enabled: false, busy: true }
   if (phase.kind === 'submitting')
     return { text: phase.attempt > 0 ? 'High demand — retrying…' : 'Reserving your device…', enabled: false, busy: true }
   if (phase.kind === 'queued') return { text: 'You’re in! Confirming…', enabled: false, busy: true }

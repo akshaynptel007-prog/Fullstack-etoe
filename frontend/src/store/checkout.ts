@@ -4,6 +4,7 @@ import type { OrderStatus } from '../api/types'
 
 export type CheckoutPhase =
   | { kind: 'idle' }
+  | { kind: 'checking' }
   | { kind: 'submitting'; attempt: number; retryInMs?: number }
   | { kind: 'queued'; orderId: string; since: number }
   | { kind: 'done'; orderId: string; status: Exclude<OrderStatus, 'PENDING'> }

@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 
 import { ApiError, withRetry } from '../api/client'
 import { api } from '../api/endpoints'
@@ -19,6 +19,38 @@ export function useCheckout(saleId: number | undefined) {
   const phase = useCheckoutStore((s) => s.phase)
   const setPhase = useCheckoutStore((s) => s.setPhase)
   const sessionToken = useAuthStore((s) => s.token)
+
+  useEffect(() => {
+    if (saleId === undefined || !sessionToken) return
+
+    let active = true
+    setPhase({ kind: 'checking' })
+    void api.orders().then(({ data }) => {
+      if (!active || useAuthStore.getState().token !== sessionToken) return
+      if (useCheckoutStore.getState().phase.kind !== 'checking') return
+
+      const existing = data.find(
+        (order) => order.sale_id === saleId && order.status === 'CONFIRMED',
+      )
+      setPhase(
+        existing
+          ? { kind: 'done', orderId: existing.order_id, status: 'CONFIRMED' }
+          : { kind: 'idle' },
+      )
+    }).catch(() => {
+      if (
+        active &&
+        useAuthStore.getState().token === sessionToken &&
+        useCheckoutStore.getState().phase.kind === 'checking'
+      ) {
+        setPhase({ kind: 'idle' })
+      }
+    })
+
+    return () => {
+      active = false
+    }
+  }, [saleId, sessionToken, setPhase])
 
   const buy = useSingleFlight(async () => {
     if (saleId === undefined) return
