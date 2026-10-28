@@ -1,6 +1,6 @@
 #!/bin/bash
 set -Eeuo pipefail
-exec > >(tee -a /var/log/flashsale-free-demo-bootstrap.log) 2>&1
+exec > >(tee -a /var/log/${bootstrap_log_file}) 2>&1
 
 REGION='${aws_region}'
 SOURCE_BUCKET='${source_bucket}'

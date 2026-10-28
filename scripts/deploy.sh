@@ -157,7 +157,7 @@ if [[ "$EXIT_CODE" != "0" ]]; then
   aws logs tail "$LOG_PREFIX/migrate" --since 15m 2>/dev/null | tail -n 30 || true
   die "migrations failed (exit $EXIT_CODE)"
 fi
-ok "schema up to date, demo sale seeded"
+ok "schema up to date, sample sale seeded"
 
 # --- 6. Frontend -----------------------------------------------------------------------
 if ! $SKIP_FRONTEND; then

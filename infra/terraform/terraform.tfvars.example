@@ -5,11 +5,11 @@ project_name = "flashsale"
 environment  = "dev"
 aws_region   = "ap-south-1" # Mumbai: closest to Indian shoppers
 
-# Cost savers for a demo account
+# Optional cost controls
 # enable_nat_gateway = false   # tasks get public IPs instead of a ~$32/mo NAT
 # cpu_architecture   = "ARM64" # Graviton (deploy.sh builds an arm64 image)
 
-# Use a free CloudAMQP broker instead of Amazon MQ (~$25-30/mo):
+# Use a hosted CloudAMQP broker instead of Amazon MQ:
 # rabbitmq_external_url = "amqps://user:password@host.rmq.cloudamqp.com/vhost"
 
 # Pre-warm 10 minutes before an 8:00 PM IST sale on 1 Nov 2026, scale back at 9 PM.

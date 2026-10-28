@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Restock and reschedule the demo sale (deletes its orders).
+# Restock and reschedule the sale (deletes its orders).
 #
 #   ./scripts/reset-sale.sh --stock 500 --starts-in 60
 #   BASE_URL=https://dxxxx.cloudfront.net ADMIN_API_KEY=... ./scripts/reset-sale.sh

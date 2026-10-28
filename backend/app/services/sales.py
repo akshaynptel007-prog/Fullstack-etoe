@@ -285,7 +285,7 @@ async def reconcile_sale(
 async def seed_demo_sale(
     session: AsyncSession, *, stock: int, starts_in_seconds: int, duration_minutes: int
 ) -> tuple[int, bool]:
-    """Idempotent: creates the demo product + sale only if no sale exists."""
+    """Idempotently create the initial product and sale when none exists."""
     existing = await session.scalar(select(Sale.id).order_by(Sale.id).limit(1))
     if existing is not None:
         return existing, False

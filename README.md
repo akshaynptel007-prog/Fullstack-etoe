@@ -1,14 +1,14 @@
-# FlashSale — 500 phones, 100k requests, zero oversell
+# FlashSale — flash-sale checkout reference architecture
 
 A production-shaped reference implementation of the **festival flash-sale case study**: a limited
 batch of **500 smartphones** goes live at **8:00 PM**, and **100,000+ checkout requests** arrive in
 the first 10 seconds. Earlier trial runs suffered high latency, row-lock timeouts, API timeouts and
-an **oversell of 540/500**. This repository re-architects the client and the backend so that:
+an **oversell of 540/500**. This repository addresses the case study's main failure modes with:
 
-- **exactly 500 units are sold** — enforced by four independent layers, proven by tests;
+- an atomic Redis reservation and conditional database update to prevent overselling;
 - **every request gets a fast, deliberate answer** (`202` reserved, `200` already yours, `409` sold
   out, `429` slow down) instead of a timeout;
-- the **database only ever sees the ~500 winning orders**, never the 100k-request stampede.
+- a queue and worker that keep the checkout request path separate from order persistence.
 
 **Stack:** React 18 + TypeScript (Vite) · FastAPI (async) · Redis (Lua) · RabbitMQ · PostgreSQL ·
 NGINX · Docker Compose · Terraform on AWS (ECS Fargate, ALB, CloudFront + WAF, RDS, ElastiCache,
@@ -238,21 +238,21 @@ Details: [docs/frontend-performance.md](docs/frontend-performance.md).
 
 ## AWS deployment
 
-### Free-plan demo (single host)
+### Single-host AWS deployment profile
 
-The deployed demo uses a deliberately small, single-EC2 layout so it can run within an active
-AWS Free plan credit allowance. It keeps the application flow intact: CloudFront → NGINX → two
-stateless API containers → Redis/RabbitMQ → a worker → PostgreSQL. PostgreSQL, Redis, RabbitMQ,
-the API, worker, and web gateway all share one EC2 host; they are **not** separate managed or
-high-availability services in this demo.
+The single-host profile runs the application on one EC2 instance in `ap-south-1`, fronted by
+CloudFront. Its request flow is CloudFront → NGINX → two stateless API containers → Redis and
+RabbitMQ → a worker → PostgreSQL. These services share one EC2 host and one failure domain; they
+are not separate managed or high-availability services.
 
-![AWS free-plan demo architecture](docs/architecture-free-demo.svg)
+![Single-host AWS architecture](docs/architecture-single-host-aws.svg)
 
-The diagram shows the deployed demo, not the horizontally scaled reference design above. The
-larger ECS/Fargate, ALB, WAF, RDS, ElastiCache, and Amazon MQ design below is the production-shaped
-Terraform architecture. The demo does not establish the case-study target of 100,000 concurrent
-requests in 10 seconds. See [docs/deployment-free-demo.md](docs/deployment-free-demo.md) for setup,
-scope, and cleanup instructions.
+This profile is separate from the horizontally scaled ECS/Fargate, ALB, WAF, RDS, ElastiCache, and
+Amazon MQ Terraform architecture below. It does not establish the case-study target of 100,000
+concurrent requests in 10 seconds. See [docs/deployment-single-host-aws.md](docs/deployment-single-host-aws.md)
+for setup, scope, and cleanup instructions.
+
+### Production AWS stack
 
 ```bash
 aws sts get-caller-identity   # be logged in

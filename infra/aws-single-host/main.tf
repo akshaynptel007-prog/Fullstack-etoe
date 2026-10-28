@@ -43,7 +43,7 @@ resource "random_password" "origin_verify" {
 }
 
 locals {
-  name_prefix = "flashsale-free-demo"
+  name_prefix = var.resource_name_prefix
   bucket_name = "${local.name_prefix}-source-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.region}"
 }
 
@@ -107,7 +107,7 @@ resource "aws_security_group" "origin" {
   }
 
   egress {
-    description = "Outbound package and image downloads for the demo"
+    description = "Outbound package and image downloads for the single-host deployment"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -180,11 +180,12 @@ resource "aws_instance" "demo" {
   }
 
   user_data = templatefile("${path.module}/user-data.sh.tftpl", {
-    aws_region     = var.aws_region
-    source_bucket  = aws_s3_bucket.source.bucket
-    source_key     = aws_s3_object.source.key
-    origin_verify  = random_password.origin_verify.result
-    package_sha256 = filebase64sha256(var.source_zip_path)
+    aws_region         = var.aws_region
+    source_bucket      = aws_s3_bucket.source.bucket
+    source_key         = aws_s3_object.source.key
+    origin_verify      = random_password.origin_verify.result
+    package_sha256     = filebase64sha256(var.source_zip_path)
+    bootstrap_log_file = var.bootstrap_log_file
   })
   user_data_replace_on_change = true
 
@@ -230,7 +231,7 @@ resource "aws_cloudfront_cache_policy" "web" {
 
 resource "aws_cloudfront_distribution" "demo" {
   enabled             = true
-  comment             = "Flash-sale interview demo"
+  comment             = "FlashSale single-host AWS application"
   default_root_object = "index.html"
   is_ipv6_enabled     = true
   price_class         = "PriceClass_100"

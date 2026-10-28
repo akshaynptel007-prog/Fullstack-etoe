@@ -37,8 +37,8 @@ crash.log
 crash.*.log
 tfplan
 *.tfplan
-infra/free-demo/plan.txt
-infra/free-demo/source.zip
+infra/aws-single-host/plan.txt
+infra/aws-single-host/source.zip
 override.tf
 override.tf.json
 *_override.tf

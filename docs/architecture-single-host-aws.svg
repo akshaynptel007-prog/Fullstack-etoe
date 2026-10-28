@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1020" viewBox="0 0 1600 1020" role="img" aria-labelledby="title desc">
-  <title id="title">FlashSale AWS free-plan demo architecture</title>
+  <title id="title">FlashSale single-host AWS architecture</title>
   <desc id="desc">CloudFront routes shopper traffic to a single EC2 host. Docker Compose runs the NGINX web gateway, two stateless API replicas, Redis, RabbitMQ, one worker, and PostgreSQL. Terraform provisions CloudFront, EC2, an origin-only security group, and a private encrypted S3 source archive.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#58708d"/></marker>
@@ -14,7 +14,7 @@
     </style>
   </defs>
   <rect width="1600" height="1020" fill="#fff"/>
-  <text x="64" y="62" class="title">FlashSale · AWS free-plan demo</text>
+  <text x="64" y="62" class="title">FlashSale · Single-host AWS deployment</text>
   <text x="64" y="91" class="sub">One EC2 host runs the full application stack; CloudFront is the public HTTPS edge.</text>
 
   <rect x="54" y="126" width="1492" height="586" rx="18" class="lane"/>
@@ -80,7 +80,7 @@
 
   <!-- Provisioning lane -->
   <rect x="54" y="747" width="1492" height="207" rx="18" class="lane"/>
-  <text x="80" y="780" class="laneTitle">PROVISIONING · TERRAFORM BOOTSTRAPS THE DEMO</text>
+  <text x="80" y="780" class="laneTitle">PROVISIONING · TERRAFORM BOOTSTRAPS THE APPLICATION</text>
   <rect x="91" y="816" width="258" height="94" class="box ops"/>
   <text x="115" y="848" class="boxTitle">Terraform</text>
   <text x="115" y="873" class="boxText">CloudFront · EC2 · SG · IAM</text>
@@ -99,5 +99,5 @@
   <path d="M1087 816V711H1090V656" class="dashed"/><text x="1102" y="735" class="label">builds and starts stack</text>
 
   <rect x="54" y="972" width="1492" height="32" class="pill"/>
-  <text x="75" y="993" class="footer">Scope: demo / single host, no managed database, cache, queue, load balancer, or multi-AZ failover. The production reference architecture is documented separately.</text>
+  <text x="75" y="993" class="footer">Scope: single host; no managed database, cache, queue, load balancer, or multi-AZ failover. The production reference architecture is documented separately.</text>
 </svg>

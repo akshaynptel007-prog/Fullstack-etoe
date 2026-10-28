@@ -81,7 +81,7 @@ Also consider:
 - `enable_bot_control = true` and tighter `waf_checkout_rate_limit_per_ip` on the day;
 - open the sale and run `./scripts/reset-sale.sh` against a staging stack first.
 
-## Running the demo on AWS
+## Starting a sale on AWS
 
 ```bash
 APP_URL=$(terraform -chdir=infra/terraform output -raw app_url)
@@ -111,18 +111,18 @@ Prices change. Check the AWS Pricing Calculator. These are rough monthly figures
 | CloudFront, S3, Secrets Manager, CloudWatch | a few |
 | **Total** | **≈ $160–180** |
 
-Cheaper demo settings:
+Lower-cost configuration options:
 
 - `enable_nat_gateway = false` saves about $33. Tasks get public IPs in public subnets and are
   still locked down by security groups.
-- `rabbitmq_external_url = "amqps://…"` (CloudAMQP free plan) saves about $25–30. See
+- `rabbitmq_external_url = "amqps://…"` (a hosted shared broker) can reduce managed-service costs. See
   [PLATFORMS.md](PLATFORMS.md).
 - `CPU_ARCHITECTURE=ARM64` makes Fargate about 20% cheaper.
-- `enable_waf = false` for a private demo (not recommended for a real sale).
+- `enable_waf = false` for a private environment (not recommended for a public sale).
 - **Destroy when done:** `./scripts/destroy.sh` (add `--purge-state` to remove the state bucket).
 
-New AWS accounts (since July 2025) start on a credit-based Free Tier: up to $200 of credits on a
-6-month free plan. A short-lived demo of this stack fits comfortably within that.
+AWS credit offers and eligibility vary by account. Check the Billing console and pricing calculator
+before deploying; do not assume credits will cover this stack's estimated monthly cost.
 
 ## Production hardening checklist
 

@@ -1,5 +1,5 @@
-# One EC2 host demo profile. It preserves the Redis/RabbitMQ/PostgreSQL flow,
-# while keeping the host small enough for the AWS Free plan credit allowance.
+# Single-host AWS profile. It keeps the Redis, RabbitMQ, and PostgreSQL flow
+# intact while consolidating the services on one EC2 instance.
 services:
   api:
     deploy:
@@ -16,4 +16,4 @@ services:
       NGINX_CHECKOUT_RATE: ${NGINX_CHECKOUT_RATE:-200r/s}
       NGINX_CHECKOUT_BURST: ${NGINX_CHECKOUT_BURST:-500}
       NGINX_ACCESS_LOG: ${NGINX_ACCESS_LOG:-errors}
-      ORIGIN_VERIFY: ${ORIGIN_VERIFY:?ORIGIN_VERIFY is required for the AWS demo}
+      ORIGIN_VERIFY: ${ORIGIN_VERIFY:?ORIGIN_VERIFY is required for the AWS single-host profile}

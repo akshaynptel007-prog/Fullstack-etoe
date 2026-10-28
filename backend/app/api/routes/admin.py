@@ -7,7 +7,7 @@ from app.services.sales import reconcile_sale, reset_sale, sale_stats
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 
-@router.post("/sales/{sale_id}/reset", summary="Demo helper: restock and reschedule a sale")
+@router.post("/sales/{sale_id}/reset", summary="Restock and reschedule a sale")
 async def reset(
     sale_id: int, body: ResetSaleIn, session: SessionDep, resources: ResourcesDep
 ) -> SaleOut:

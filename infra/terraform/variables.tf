@@ -176,7 +176,7 @@ variable "mq" {
 }
 
 variable "rabbitmq_external_url" {
-  description = "Use an external broker (e.g. CloudAMQP free plan) instead of Amazon MQ: amqps://user:pass@host/vhost"
+  description = "Use an external hosted broker instead of Amazon MQ: amqps://user:pass@host/vhost"
   type        = string
   default     = ""
   sensitive   = true

@@ -1,34 +1,31 @@
-# Hosting platforms
+# Hosting options
 
-Where each piece can run, from "free for a demo" to "production on AWS". Free-tier terms change:
-check the vendor's pricing page before relying on a limit. Figures below were checked in October
-2026; sources are linked.
+This guide compares deployment configurations for the application. Provider pricing, quotas, and
+service eligibility change; check current vendor documentation before choosing a plan.
 
 ## Recommended setups
 
 | Goal | Frontend | API + worker | PostgreSQL | Redis | RabbitMQ |
 |---|---|---|---|---|---|
-| **Interview demo on AWS (this repo)** | S3 + CloudFront | ECS Fargate | RDS | ElastiCache | Amazon MQ *or* CloudAMQP free |
-| **Cheapest AWS** | S3 + CloudFront | ECS Fargate, `enable_nat_gateway=false`, ARM64 | RDS t4g.micro | ElastiCache t4g.micro | **CloudAMQP free** (`rabbitmq_external_url`) |
-| **Almost entirely free (non-AWS)** | Cloudflare Pages / Vercel / Netlify | Render / Railway / Fly.io container | Neon or Supabase free | Upstash free | CloudAMQP free |
+| **Single-host AWS** (`infra/aws-single-host`) | CloudFront → NGINX on EC2 | Docker Compose on EC2 | Container on EC2 | Container on EC2 | Container on EC2 |
+| **Managed AWS** (`infra/terraform`) | Private S3 + CloudFront | ECS Fargate | RDS | ElastiCache | Amazon MQ or hosted broker |
+| **Split managed services** | Static CDN host | Container application host | Neon or Supabase | Upstash or Redis Cloud | CloudAMQP or another hosted broker |
 
 The application only needs four URLs: `DATABASE_URL`, `REDIS_URL`, `RABBITMQ_URL`, plus the
 frontend's `/api` reaching the API. Any combination works.
 
 ## RabbitMQ
 
-| Provider | Free? | Notes |
-|---|---|---|
-| **CloudAMQP — "Little Lemur" (shared)** | **Free** | ≈ 1M messages/month, 20 concurrent connections, 100 queues, 10k queued messages, idle queues removed after 28 days; meant for development ([pricing](https://cloudamqp.com/pricing), [shared-plan limits](https://www.cloudamqp.com/blog/added-limits-for-shared-plans-lemur-tiger.html)). AMQPS URL works directly as `RABBITMQ_URL` |
-| CloudAMQP — LavinMQ free plan | Free | AMQP-compatible broker by the same company. Our client uses plain AMQP 0-9-1 features (DLX, TTL, confirms), but verify compatibility before relying on it |
-| Stackhero for RabbitMQ | No (paid "Hobby" ≈ $19/mo; no card needed to start) | [pricing](https://www.stackhero.io/en/services/RabbitMQ/pricing) |
-| **Amazon MQ for RabbitMQ** | No (≈ $25–30/mo for mq.t3.micro single-instance; check pricing) | managed, in-VPC, AMQPS. `mq.t3.micro` runs the **3.13** series only; RabbitMQ 4.2 needs `mq.m7g` ([version docs](https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/rabbitmq-version-management.html), [pricing](https://aws.amazon.com/amazon-mq/pricing/)) |
-| Self-hosted container (Railway, Render, Fly.io, EC2) | trial credits only | you own persistence, upgrades and monitoring |
+| Provider | Plan and operation |
+|---|---|
+| **CloudAMQP shared broker** | Shared service with plan-specific quotas. Check current connection, message, queue, and retention limits. Use its AMQPS URL as `RABBITMQ_URL`. See [pricing](https://cloudamqp.com/pricing). |
+| CloudAMQP LavinMQ | AMQP-compatible broker. Verify support for AMQP 0-9-1 features used here: dead-letter exchanges, TTL queues, and publisher confirms. |
+| Stackhero for RabbitMQ | Hosted service; check current [pricing](https://www.stackhero.io/en/services/RabbitMQ/pricing). |
+| **Amazon MQ for RabbitMQ** | Managed broker in the AWS VPC with AMQPS. Check current pricing and [supported versions](https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/rabbitmq-version-management.html). |
+| Self-hosted broker | The operator owns persistence, upgrades, monitoring, and recovery. |
 
-**Is the free CloudAMQP plan enough?** For a demo, yes. Each API/worker process holds one
-connection, so 20 connections covers about 10 tasks. Only *winning* checkouts are published
-(≈ 500 per sale), plus retries, so 1M messages/month is plenty. It is a shared instance, though:
-don't run a real sale or the load test against it.
+For low-traffic evaluation, a shared broker can be suitable if its limits cover the API and worker
+connections. Use a dedicated broker for load tests or production traffic.
 
 Using it with Terraform:
 
@@ -42,19 +39,19 @@ Amazon MQ metrics) are skipped. CPU scaling still applies.
 
 ## PostgreSQL
 
-| Provider | Free tier | Notes |
-|---|---|---|
-| **Neon** | Free plan: 100 projects, 0.5 GB per project (raised to 1 GB in a late-2026 update according to [this digest](https://releases.sh/collections/serverless-postgres/digest/2026-09-28); [official pricing](https://neon.com/pricing)), scale-to-zero compute | Use `postgresql+asyncpg://…?ssl=require`. Scale-to-zero adds a cold start on the first query |
-| Supabase | free project (pauses after inactivity) | plain Postgres; use the direct connection string |
-| **AWS RDS** | covered by new-account credits | what this repo provisions |
+| Provider | Notes |
+|---|---|
+| **Neon** | Managed PostgreSQL with scale-to-zero options. Check current quotas and connection guidance; scale-to-zero can add a cold start. See [pricing](https://neon.com/pricing). |
+| Supabase | Managed PostgreSQL. Check current plan limits, pause behavior, and direct connection options. See [pricing](https://supabase.com/pricing). |
+| **AWS RDS** | Managed PostgreSQL provisioned by `infra/terraform`; TLS is required by this configuration. |
 
 ## Redis
 
-| Provider | Free tier | Notes |
-|---|---|---|
-| **Upstash** | 256 MB, 500K commands/month ([pricing](https://upstash.com/pricing/redis)) | supports `EVALSHA`/Lua; use the `rediss://` URL. 500K commands ≈ 250K checkouts, fine for demos but not a load test |
-| Redis Cloud | small free database | Lua supported |
-| **AWS ElastiCache** | covered by new-account credits | what this repo provisions (TLS + AUTH) |
+| Provider | Notes |
+|---|---|
+| **Upstash** | Managed Redis with Lua support. Verify current command quotas and use the `rediss://` URL. See [pricing](https://upstash.com/pricing/redis). |
+| Redis Cloud | Managed Redis. Confirm Lua support, connection limits, and persistence for the selected plan. |
+| **AWS ElastiCache** | Managed Redis provisioned by `infra/terraform`, with TLS and authentication enabled. |
 
 Requirements: Lua scripting (`EVAL`/`EVALSHA`) and, ideally, `maxmemory-policy noeviction`.
 
@@ -63,7 +60,7 @@ Requirements: Lua scripting (`EVAL`/`EVALSHA`) and, ideally, `maxmemory-policy n
 | Provider | Notes |
 |---|---|
 | **S3 + CloudFront** (this repo) | same-origin `/api` routing through CloudFront, WAF in front of both |
-| Cloudflare Pages / Vercel / Netlify | free static hosting with a CDN. Set `VITE_API_BASE_URL=https://api.example.com/api/v1` at build time and `CORS_ORIGINS` on the API |
+| Cloudflare Pages / Vercel / Netlify | Static hosting with a CDN. Set `VITE_API_BASE_URL=https://api.example.com/api/v1` at build time and configure `CORS_ORIGINS` on the API. Check current plan limits. |
 
 ## API and worker
 
@@ -72,12 +69,8 @@ Requirements: Lua scripting (`EVAL`/`EVALSHA`) and, ideally, `maxmemory-policy n
 | **AWS ECS Fargate** (this repo) | autoscaling, Spot workers, scheduled pre-warm |
 | Render / Railway / Fly.io | run the same image: `/app/scripts/start-api.sh` for the API, `python -m app.worker` for the worker, `sh -c "alembic upgrade head && python -m app.cli seed"` once |
 
-## AWS account
+## AWS account and cost
 
-New AWS customers (accounts created since July 2025) get a credit-based Free Tier: $100 on sign-up,
-plus up to $100 more for completing onboarding activities, on a 6-month free plan
-([announcement](https://aws.amazon.com/about-aws/whats-new/2025/07/aws-free-tier-credits-month-free-plan/),
-[FAQ](https://aws.amazon.com/free/faqs/)). At ≈ $5–6/day, a demo of this stack runs for weeks on
-those credits. Free-*plan* accounts can't use some services. If a resource such as Amazon MQ or
-ElastiCache is refused, upgrade the account to the paid plan (unused credits still apply).
-Remember `./scripts/destroy.sh` afterwards.
+Account credits, service eligibility, and regional prices vary. Check the AWS Billing console and
+Pricing Calculator before provisioning. The managed stack can incur ongoing charges while its
+resources exist. Run `./scripts/destroy.sh` when the environment is no longer needed.

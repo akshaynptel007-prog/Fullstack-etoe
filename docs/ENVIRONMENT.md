@@ -61,7 +61,7 @@ Read from environment variables (case-insensitive) or `backend/.env`.
 | `WORKER_RETRY_DELAY_MS` | `2000` | TTL of the retry queue |
 | `WORKER_METRICS_PORT` | `9100` | Prometheus endpoint of the worker |
 | `WORKER_SHUTDOWN_GRACE_SECONDS` | `25` | drain time on SIGTERM |
-| `SEED_SALE_STOCK` | `500` | demo sale created by `python -m app.cli seed` |
+| `SEED_SALE_STOCK` | `500` | initial sale created by `python -m app.cli seed` |
 | `SEED_SALE_STARTS_IN_SECONDS` | `120` (local) / `900` (AWS) | |
 | `SEED_SALE_DURATION_MINUTES` | `60` / `120` | |
 | `WEB_CONCURRENCY` | `1` | uvicorn processes per container (scale with replicas instead) |

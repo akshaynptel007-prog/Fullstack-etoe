@@ -1,5 +1,5 @@
 output "app_url" {
-  description = "HTTPS URL for the demo app."
+  description = "HTTPS URL for the application."
   value       = "https://${aws_cloudfront_distribution.demo.domain_name}"
 }
 

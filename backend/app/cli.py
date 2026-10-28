@@ -1,6 +1,6 @@
 """Operational commands, run inside the backend image.
 
-python -m app.cli seed                      # idempotent demo data + Redis priming
+python -m app.cli seed                      # create initial sale data + prime Redis
 python -m app.cli reset-sale --stock 500 --starts-in 30
 python -m app.cli seed-loadtest-users --count 5000 --out /data/tokens.json
 python -m app.cli verify-sale --wait 120    # exit 1 if oversold / inconsistent
@@ -176,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("seed", help="create demo product/sale if missing; prime Redis").set_defaults(
+    sub.add_parser("seed", help="create initial product/sale if missing; prime Redis").set_defaults(
         fn=cmd_seed
     )
 

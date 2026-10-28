@@ -33,7 +33,7 @@ clean: ## Stop the stack and delete all volumes (DESTROYS local data)
 observability: ## Start Prometheus (:59090) + Grafana (:53000)
 	$(COMPOSE) --profile observability up -d prometheus grafana
 
-reset-sale: ## Reset the demo sale (STOCK=500 STARTS_IN=30)
+reset-sale: ## Reset the seeded sale (STOCK=500 STARTS_IN=30)
 	BASE_URL=$(BASE_URL) ADMIN_API_KEY=$(ADMIN_API_KEY) ./scripts/reset-sale.sh --stock $${STOCK:-500} --starts-in $${STARTS_IN:-30}
 
 # --- Quality -----------------------------------------------------------------
