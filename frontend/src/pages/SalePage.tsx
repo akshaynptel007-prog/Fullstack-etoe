@@ -54,30 +54,31 @@ export default function SalePage() {
 
   return (
     <main className="page">
-      <section className="hero">
-        <div className="hero-art">
+      <section className="product-layout">
+        <div className="product-media">
           <PhoneArt />
         </div>
-        <div className="hero-body">
-          <div className="hero-meta">
+        <div className="product-info">
+          <div className="product-status">
             <span className="eyebrow">{sale.name}</span>
             <span className={`badge badge-${state}`}>{STATE_BADGE[state]}</span>
           </div>
           <h1>{sale.product.name}</h1>
           <p className="desc">{sale.product.description}</p>
-          <p className="price">
-            {price} <span className="price-note">· limit 1 per customer</span>
-          </p>
-
+          <p className="purchase-limit">Limited to one unit per customer</p>
           {state === 'upcoming' && (
-            <div className="opens">
-              <span className="opens-label">Opens {formatTime(sale.starts_at)}</span>
+            <div className="opens product-opens">
+              <span className="opens-label">Sale opens {formatTime(sale.starts_at)}</span>
               <Countdown msLeft={msToStart} />
             </div>
           )}
-
-          <StockMeter remaining={remaining} total={sale.total_stock} liveMode={liveMode} />
-
+        </div>
+        <aside className="purchase-card" aria-label="Purchase options">
+          <p className="price">{price}</p>
+          <p className="price-note">Flash sale price</p>
+          <div className="purchase-stock">
+            <StockMeter remaining={remaining} total={sale.total_stock} liveMode={liveMode} />
+          </div>
           <BuyButton
             saleState={state}
             signedIn={signedIn}
@@ -90,22 +91,7 @@ export default function SalePage() {
           {!signedIn && (showAuth || state === 'upcoming') && (
             <AuthPanel onDone={() => setShowAuth(false)} />
           )}
-        </div>
-      </section>
-
-      <section className="facts" aria-label="How this sale works">
-        <div>
-          <h2>Fair for everyone</h2>
-          <p>One unit per account. Every click is counted once — no need to refresh or tap again.</p>
-        </div>
-        <div>
-          <h2>Instant answer</h2>
-          <p>Your unit is held the moment you tap Buy; we confirm the order a second later.</p>
-        </div>
-        <div>
-          <h2>Never oversold</h2>
-          <p>Stock is counted atomically, so if you’re confirmed, a phone is truly yours.</p>
-        </div>
+        </aside>
       </section>
     </main>
   )

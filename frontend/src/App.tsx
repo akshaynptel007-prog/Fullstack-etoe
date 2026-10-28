@@ -61,7 +61,7 @@ export function App() {
           </Route>
         </Switch>
       </Suspense>
-      <footer className="footer">Prices include GST · One unit per customer · FlashSale reference application</footer>
+      <footer className="footer">Prices include GST · Limit one per customer</footer>
     </ErrorBoundary>
   )
 }
